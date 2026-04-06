@@ -3,8 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-dark-950 text-dark-100 antialiased;
+    background-image:
+      radial-gradient(ellipse 120% 80% at 50% -20%, rgba(14, 165, 233, 0.12), transparent 50%),
+      radial-gradient(ellipse 80% 50% at 100% 50%, rgba(139, 92, 246, 0.06), transparent 45%);
+    background-attachment: fixed;
   }
 }
 
@@ -21,4 +28,16 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-dark-500;
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
 }

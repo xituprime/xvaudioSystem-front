@@ -3,9 +3,9 @@ import Navbar from '../components/Navbar';
 
 export default function PublicLayout() {
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-dvh bg-dark-950">
       <Navbar />
-      <main>
+      <main className="max-w-[100vw] overflow-x-hidden pb-safe">
         <Outlet />
       </main>
     </div>

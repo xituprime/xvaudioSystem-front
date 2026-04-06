@@ -1,8 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
+import { downloadReceiptPdf } from '../utils/receiptPdf';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
+
+function isSaleFromToday(sale) {
+  const raw = sale?.createdAt ?? sale?.date ?? sale?.fecha;
+  if (!raw) return false;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+}
+
+function getSaleTotal(sale) {
+  return Number(sale?.total ?? sale?.totalVentas ?? sale?.amount ?? sale?.totalAmount ?? 0);
+}
+
+function getSaleProfit(sale) {
+  let p = Number(sale?.profit ?? sale?.ganancia ?? sale?.profitAmount ?? sale?.totalProfit ?? sale?.margin ?? sale?.gain ?? sale?.earnings ?? sale?.details?.profit ?? sale?.summary?.profit ?? sale?.summary?.ganancia ?? 0);
+  if (p > 0) return p;
+  const items = sale?.items ?? sale?.products ?? sale?.details?.items ?? [];
+  if (items.length > 0) {
+    p = items.reduce((acc, it) => {
+      const qty = Number(it?.quantity ?? it?.qty ?? 0);
+      const price = Number(it?.price ?? it?.unitPrice ?? it?.publicPrice ?? 0);
+      const cost = Number(it?.cost ?? it?.unitCost ?? it?.purchasePrice ?? 0);
+      return acc + (price - cost) * qty;
+    }, 0);
+  }
+  return p;
+}
 
 export default function Reports() {
   const [dayReport, setDayReport] = useState(null);
@@ -18,9 +47,14 @@ export default function Reports() {
     const fetchDay = async () => {
       try {
         const { data } = await api.get('/sales/reports/day');
-        if (data?.success !== false) setDayReport(data);
+        if (data?.success !== false) {
+          const raw = data?.data ?? data?.report ?? data;
+          setDayReport(raw || data);
+        }
       } catch {
-        // opcional
+        // si falla, Ventas del día se calculará desde el historial
+      } finally {
+        setLoading(false);
       }
     };
     fetchDay();
@@ -29,20 +63,31 @@ export default function Reports() {
   const fetchSales = async (pageNum = 1) => {
     setLoadingSales(true);
     try {
-      const params = new URLSearchParams();
-      params.set('page', pageNum);
-      params.set('limit', PAGE_SIZE);
-      if (dateFrom) params.set('from', dateFrom);
-      if (dateTo) params.set('to', dateTo);
-      const { data } = await api.get(`/sales?${params.toString()}`);
-      const list = data?.sales ?? data?.data ?? (Array.isArray(data) ? data : []);
-      setSales(Array.isArray(list) ? list : []);
-      const total = data?.total ?? data?.pagination?.total ?? list.length;
-      setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)));
-      setPage(pageNum);
+      let data;
+      if (dateFrom && dateTo) {
+        const res = await api.get('/sales/reports/range', {
+          params: { from: dateFrom, to: dateTo },
+        });
+        data = res.data;
+        setPage(1);
+        const list = Array.isArray(data) ? data : data?.sales ?? data?.data ?? [];
+        setSales(Array.isArray(list) ? list : []);
+        setTotalPages(1);
+      } else {
+        const res = await api.get('/sales/reports/history', {
+          params: { page: pageNum, limit: PAGE_SIZE },
+        });
+        data = res.data;
+        const list = Array.isArray(data) ? data : data?.sales ?? data?.data ?? data?.data?.sales ?? [];
+        setSales(Array.isArray(list) ? list : []);
+        const total = data?.total ?? data?.pagination?.total ?? list?.length ?? 0;
+        setTotalPages(Math.max(1, Math.ceil(Number(total) / PAGE_SIZE)));
+        setPage(pageNum);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al cargar ventas');
       setSales([]);
+      setTotalPages(1);
     } finally {
       setLoadingSales(false);
     }
@@ -53,6 +98,15 @@ export default function Reports() {
   }, [dateFrom, dateTo]);
 
   const loadingState = loading && !dayReport;
+
+  const salesToday = useMemo(() => sales.filter(isSaleFromToday), [sales]);
+  const dayTotalFromSales = useMemo(() => salesToday.reduce((a, s) => a + getSaleTotal(s), 0), [salesToday]);
+  const dayProfitFromSales = useMemo(() => salesToday.reduce((a, s) => a + getSaleProfit(s), 0), [salesToday]);
+
+  const dayTotalDisplay =
+    Number(dayReport?.totalSales ?? dayReport?.sales ?? dayReport?.total ?? dayReport?.totalVentas ?? '') || dayTotalFromSales;
+  const dayProfitDisplay =
+    Number(dayReport?.totalProfit ?? dayReport?.profit ?? dayReport?.ganancia ?? dayReport?.gananciaDia ?? '') || dayProfitFromSales;
 
   return (
     <div>
@@ -70,13 +124,13 @@ export default function Reports() {
             <div className="bg-dark-900 border border-dark-700 rounded-xl p-4">
               <p className="text-sm text-dark-400">Total vendido hoy</p>
               <p className="text-xl font-bold text-primary-400">
-                Q{Number(dayReport?.totalSales ?? 0).toLocaleString()}
+                Q{Number(dayTotalDisplay ?? 0).toLocaleString()}
               </p>
             </div>
             <div className="bg-dark-900 border border-dark-700 rounded-xl p-4">
               <p className="text-sm text-dark-400">Ganancia hoy</p>
               <p className="text-xl font-bold text-emerald-400">
-                Q{Number(dayReport?.totalProfit ?? 0).toLocaleString()}
+                Q{Number(dayProfitDisplay ?? 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -115,7 +169,9 @@ export default function Reports() {
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500" />
           </div>
         ) : sales.length === 0 ? (
-          <div className="p-12 text-center text-dark-500">No hay ventas en este rango.</div>
+          <div className="p-12 text-center text-dark-500">
+            No hay ventas en este rango.
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -140,9 +196,9 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((sale) => (
+                  {sales.map((sale, idx) => (
                     <tr
-                      key={sale._id}
+                      key={sale?.id ?? sale?._id ?? sale?.receiptNumber ?? `sale-${idx}`}
                       className="border-b border-dark-700/50 hover:bg-dark-800/30"
                     >
                       <td className="py-3 px-4 text-dark-200 font-mono text-sm">
@@ -154,24 +210,31 @@ export default function Reports() {
                           : '—'}
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-dark-100">
-                        Q{Number(sale.total ?? 0).toLocaleString()}
+                        Q{Number(getSaleTotal(sale)).toLocaleString()}
                       </td>
                       <td className="py-3 px-4 text-right text-emerald-400">
-                        Q{Number(sale.profit ?? 0).toLocaleString()}
+                        Q{Number(getSaleProfit(sale)).toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        {sale.receiptUrl ? (
-                          <a
-                            href={sale.receiptUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary-400 hover:text-primary-300 text-sm font-medium"
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => downloadReceiptPdf(sale)}
+                            className="text-primary-400 hover:text-primary-300 text-sm font-medium underline"
                           >
-                            Ver recibo
-                          </a>
-                        ) : (
-                          <span className="text-dark-500 text-sm">—</span>
-                        )}
+                            Descargar PDF
+                          </button>
+                          {sale.receiptUrl ? (
+                            <a
+                              href={sale.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-dark-400 hover:text-dark-300 text-sm"
+                            >
+                              Ver (servidor)
+                            </a>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

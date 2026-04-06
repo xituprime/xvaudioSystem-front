@@ -1,24 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-
-// Aceptar image, imageUrl, secure_url (Cloudinary) o ruta relativa
-function imageUrlFrom(product) {
-  const raw = product?.image ?? product?.imageUrl ?? product?.secure_url;
-  if (!raw || typeof raw !== 'string') return null;
-  const url = raw.trim();
-  if (url.startsWith('http')) return url;
-  return url.startsWith('/') ? url : `/${url}`;
-}
+import { getPrimaryImageUrl } from '../utils/productImages';
 
 export default function ProductCard({ product, isAdmin, onDelete }) {
-  const imageUrl = imageUrlFrom(product);
+  const imageUrl = getPrimaryImageUrl(product);
   const [imageFailed, setImageFailed] = useState(false);
   const showPlaceholder = !imageUrl || imageFailed;
   const id = product?.id ?? product?._id;
 
   return (
-    <div className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden shadow-lg hover:border-dark-600 transition-colors">
-      <div className="aspect-square bg-dark-800 flex items-center justify-center overflow-hidden relative">
+    <div className="group bg-dark-900/80 border border-dark-700/80 rounded-2xl overflow-hidden shadow-lg hover:border-primary-500/30 hover:shadow-primary-900/10 hover:shadow-2xl transition-all duration-300">
+      <div className="h-32 sm:h-36 md:h-44 lg:h-48 xl:h-52 w-full shrink-0 bg-dark-800 flex items-center justify-center overflow-hidden relative">
         {imageUrl && !imageFailed && (
           <img
             src={imageUrl}
@@ -28,10 +20,10 @@ export default function ProductCard({ product, isAdmin, onDelete }) {
           />
         )}
         {showPlaceholder && (
-          <span className="text-5xl text-dark-500" aria-hidden>📦</span>
+          <span className="text-4xl sm:text-5xl text-dark-500" aria-hidden>📦</span>
         )}
       </div>
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         <p className="text-xs font-medium text-primary-400 uppercase tracking-wide">
           {product?.category || 'Sin categoría'}
         </p>

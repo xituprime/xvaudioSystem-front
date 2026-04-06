@@ -36,7 +36,8 @@ export default function Products() {
   const handleDelete = async (product) => {
     if (!window.confirm(`¿Eliminar "${product.name}"?`)) return;
     try {
-      const { data } = await api.delete(`/products/${product._id}`);
+      const pid = product?.id ?? product?._id;
+      const { data } = await api.delete(`/products/${pid}`);
       if (data?.success === false) {
         toast.error(data.message || 'Error al eliminar');
         return;
@@ -58,25 +59,30 @@ export default function Products() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <h1 className="text-2xl font-bold text-dark-100">
-          {isAdmin ? 'Productos' : 'Catálogo'}
-        </h1>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-dark-50 tracking-tight">
+            {isAdmin ? 'Productos' : 'Catálogo'}
+          </h1>
+          <p className="text-dark-500 text-sm mt-1">
+            {isAdmin ? 'Gestiona inventario y precios' : 'Explora nuestros productos'}
+          </p>
+        </div>
         {isAdmin && (
           <Link
             to="/products/new"
-            className="inline-flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white font-medium rounded-lg transition"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-xl transition shadow-lg shadow-primary-900/25"
           >
             + Nuevo producto
           </Link>
         )}
       </div>
       {products.length === 0 ? (
-        <div className="bg-dark-900 border border-dark-700 rounded-xl p-12 text-center text-dark-400">
+        <div className="rounded-2xl border border-dark-700/80 bg-dark-900/50 p-16 text-center text-dark-400">
           No hay productos.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
           {products.map((p, index) => (
             <ProductCard
               key={p?.id ?? p?._id ?? `product-${index}`}

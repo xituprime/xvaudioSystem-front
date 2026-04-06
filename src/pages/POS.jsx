@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
+import { getPrimaryImageUrl } from '../utils/productImages';
 
 export default function POS() {
   const { isAdmin } = useAuth();
@@ -109,11 +110,37 @@ export default function POS() {
       toast.error('El carrito está vacío');
       return;
     }
+    const items = cart
+      .map((c) => {
+        const productId = c.id ?? c._id;
+        const quantity = Number(c.qty) || 1;
+        if (productId == null || productId === '') return null;
+        const idStr = String(productId);
+        return {
+          productId: idStr,
+          product_id: idStr,
+          quantity,
+          qty: quantity,
+        };
+      })
+      .filter(Boolean);
+    if (items.length === 0) {
+      toast.error('No hay ítems válidos en el carrito.');
+      return;
+    }
     setSelling(true);
     setLastReceiptUrl(null);
     try {
+      // Varias formas por compatibilidad con distintos backends
+      const itemPayload = items.map((item) => ({
+        productId: item.productId,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        qty: item.qty,
+      }));
       const payload = {
-        items: cart.map((c) => ({ productId: c.id ?? c._id, quantity: c.qty })),
+        items: itemPayload,
+        products: itemPayload,
       };
       const { data } = await api.post('/sales', payload);
       if (data?.success === false) {
@@ -124,7 +151,12 @@ export default function POS() {
       setLastReceiptUrl(data?.receiptUrl ?? data?.sale?.receiptUrl ?? null);
       setCart([]);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al registrar venta');
+      const msg =
+        err.response?.data?.message ||
+        (err.code === 'ECONNABORTED' && 'El servidor no respondió a tiempo.') ||
+        (err.message?.toLowerCase().includes('network') && 'No se pudo conectar. ¿El backend está en marcha en el puerto 5000?') ||
+        'Error al registrar venta. Revisa que el backend esté activo y la ruta POST /api/sales.';
+      toast.error(msg);
     } finally {
       setSelling(false);
     }
@@ -139,8 +171,8 @@ export default function POS() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-dark-100 mb-6">POS - Punto de venta</h1>
+    <div className="max-w-[100vw] overflow-x-hidden">
+      <h1 className="text-xl sm:text-2xl font-bold text-dark-100 mb-4 sm:mb-6">POS - Punto de venta</h1>
 
       {lastReceiptUrl && (
         <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
@@ -156,9 +188,9 @@ export default function POS() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Lista productos */}
-        <div className="lg:col-span-2 bg-dark-900 border border-dark-700 rounded-xl p-4 h-[70vh] flex flex-col">
+        <div className="lg:col-span-2 bg-dark-900 border border-dark-700 rounded-xl p-3 sm:p-4 min-h-0 h-[min(50dvh,360px)] sm:h-[min(56dvh,420px)] lg:h-[70vh] flex flex-col">
           <input
             type="text"
             value={search}
@@ -166,32 +198,48 @@ export default function POS() {
             placeholder="Buscar por nombre, categoría o marca..."
             className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-lg text-dark-100 placeholder-dark-500 focus:ring-2 focus:ring-primary-500 outline-none mb-4"
           />
-          <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
             {filteredProducts.length === 0 ? (
               <p className="col-span-full text-dark-500 text-sm py-8 text-center">
                 {search.trim() ? 'Ningún producto coincide con la búsqueda.' : 'No hay productos con stock.'}
               </p>
             ) : (
-              filteredProducts.map((p) => (
-                <button
-                  key={productId(p)}
-                  type="button"
-                  onClick={() => addToCart(p)}
-                  className="p-4 bg-dark-800 border border-dark-600 rounded-lg text-left hover:border-primary-500 hover:bg-dark-700 transition"
-                >
-                  <p className="font-medium text-dark-100 truncate">{p?.name ?? p?.nombre ?? 'Producto'}</p>
-                  <p className="text-primary-400 font-semibold mt-1">
-                    Q{Number(p?.publicPrice ?? 0).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-dark-500">Stock: {p?.stock ?? 0}</p>
-                </button>
-              ))
+              filteredProducts.map((p) => {
+                const imgUrl = getPrimaryImageUrl(p);
+                return (
+                  <button
+                    key={productId(p)}
+                    type="button"
+                    onClick={() => addToCart(p)}
+                    className="flex flex-col bg-dark-800 border border-dark-600 rounded-lg overflow-hidden text-left hover:border-primary-500 hover:bg-dark-700 transition"
+                  >
+                    <div className="h-[4.25rem] sm:h-24 md:h-28 shrink-0 bg-dark-700 flex items-center justify-center overflow-hidden">
+                      {imgUrl ? (
+                        <img
+                          src={imgUrl}
+                          alt={p?.name ?? p?.nombre ?? ''}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-4xl text-dark-500">📦</span>
+                      )}
+                    </div>
+                    <div className="p-3 flex-1 min-w-0">
+                      <p className="font-medium text-dark-100 truncate text-sm">{p?.name ?? p?.nombre ?? 'Producto'}</p>
+                      <p className="text-primary-400 font-semibold mt-1 text-sm">
+                        Q{Number(p?.publicPrice ?? 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-dark-500">Stock: {p?.stock ?? 0}</p>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
 
         {/* Carrito */}
-        <div className="bg-dark-900 border border-dark-700 rounded-xl p-4 h-[70vh] flex flex-col">
+        <div className="bg-dark-900 border border-dark-700 rounded-xl p-3 sm:p-4 min-h-0 h-[min(42dvh,320px)] sm:h-[min(48dvh,380px)] lg:h-[70vh] flex flex-col">
           <h2 className="font-semibold text-dark-200 mb-4">Carrito</h2>
           <div className="flex-1 overflow-y-auto space-y-3">
             {cart.length === 0 ? (

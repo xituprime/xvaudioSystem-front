@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
-import { downloadReceiptPdf } from '../utils/receiptPdf';
+import { downloadReceiptPdf, getSaleCustomerName } from '../utils/receiptPdf';
 
 const PAGE_SIZE = 20;
 
@@ -184,6 +184,9 @@ export default function Reports() {
                     <th className="text-left py-4 px-4 text-sm font-semibold text-dark-300">
                       Fecha
                     </th>
+                    <th className="text-left py-4 px-4 text-sm font-semibold text-dark-300">
+                      Cliente
+                    </th>
                     <th className="text-right py-4 px-4 text-sm font-semibold text-dark-300">
                       Total
                     </th>
@@ -208,6 +211,9 @@ export default function Reports() {
                         {sale.createdAt
                           ? new Date(sale.createdAt).toLocaleString('es')
                           : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-dark-300 text-sm max-w-[140px] truncate" title={getSaleCustomerName(sale)}>
+                        {getSaleCustomerName(sale) || '—'}
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-dark-100">
                         Q{Number(getSaleTotal(sale)).toLocaleString()}

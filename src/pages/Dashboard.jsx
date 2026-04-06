@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
+import { parseDayReportResponse, parseProfitsReportResponse } from '../utils/dashboardMetrics';
 
 export default function Dashboard() {
   const [dayReport, setDayReport] = useState(null);
@@ -16,12 +17,14 @@ export default function Dashboard() {
           api.get('/sales/reports/profits'),
         ]);
         if (dayRes.status === 'fulfilled' && dayRes.value?.data?.success !== false) {
-          const d = dayRes.value.data;
-          setDayReport(d?.data ?? d?.report ?? d);
+          const raw = dayRes.value.data;
+          const parsed = parseDayReportResponse(raw);
+          setDayReport(parsed.raw ?? raw);
         }
         if (profitsRes.status === 'fulfilled' && profitsRes.value?.data?.success !== false) {
-          const p = profitsRes.value.data;
-          setProfits(p?.data ?? p?.report ?? p);
+          const raw = profitsRes.value.data;
+          const parsed = parseProfitsReportResponse(raw);
+          setProfits(parsed.raw ?? raw);
         }
         if (dayRes.status === 'rejected' && dayRes.reason?.response?.status !== 404) {
           toast.error(dayRes.reason?.response?.data?.message || 'Error al cargar ventas del día');
@@ -49,12 +52,16 @@ export default function Dashboard() {
     );
   }
 
-  const daySales =
-    dayReport?.totalSales ?? dayReport?.sales ?? dayReport?.total ?? dayReport?.totalVentas ?? 0;
-  const dayProfit =
-    dayReport?.totalProfit ?? dayReport?.profit ?? dayReport?.ganancia ?? dayReport?.gananciaDia ?? 0;
-  const totalProfit =
-    profits?.totalProfit ?? profits?.profit ?? profits?.ganancia ?? profits?.gananciaTotal ?? profits?.total ?? 0;
+  const dayParsed = parseDayReportResponse(dayReport ?? {});
+  const profitsParsed = parseProfitsReportResponse(profits ?? {});
+  const profitsAsDay = parseDayReportResponse(profits ?? {});
+
+  let daySales = dayParsed.sales;
+  let dayProfit = dayParsed.profit;
+  if (daySales === 0 && profitsAsDay.sales > 0) daySales = profitsAsDay.sales;
+  if (dayProfit === 0 && profitsAsDay.profit > 0) dayProfit = profitsAsDay.profit;
+
+  const totalProfit = profitsParsed.totalProfit;
 
   const cards = [
     {
@@ -152,6 +159,12 @@ export default function Dashboard() {
             className="px-4 py-2.5 bg-dark-800 hover:bg-dark-700 border border-dark-600 rounded-lg text-dark-200 font-medium text-sm transition"
           >
             Reportes
+          </Link>
+          <Link
+            to="/dashboard/quotes"
+            className="px-4 py-2.5 bg-dark-800 hover:bg-dark-700 border border-dark-600 rounded-lg text-dark-200 font-medium text-sm transition"
+          >
+            Cotizaciones
           </Link>
         </div>
       </div>

@@ -1,17 +1,65 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
 import { getPrimaryImageUrl } from '../utils/productImages';
+import { quoteByIdPath } from '../config/apiPaths';
+import { unwrapEntity } from '../utils/apiData';
+
+function buildCartFromQuote(quote, productList) {
+  const raw =
+    quote?.items || quote?.quoteItems || quote?.lineItems || quote?.lines || [];
+  return raw
+    .map((line) => {
+      const pid =
+        line.productId ?? line.product_id ?? line.product?.id ?? line.product?._id;
+      if (pid == null || pid === '') return null;
+      const qty = Math.max(1, Number(line.quantity ?? line.qty ?? 1));
+      const prod = productList.find((p) => String(p?.id ?? p?._id) === String(pid));
+      const name =
+        prod?.name ??
+        prod?.nombre ??
+        line.productName ??
+        line.name ??
+        line.product?.name ??
+        'Producto';
+      const publicPrice = Number(
+        prod?.publicPrice ?? line.unitPrice ?? line.price ?? line.publicPrice ?? 0
+      );
+      const purchasePrice = Number(prod?.purchasePrice ?? line.purchasePrice ?? 0);
+      const idStr = String(pid);
+      return {
+        _id: idStr,
+        id: idStr,
+        name,
+        publicPrice,
+        purchasePrice,
+        qty,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buyerNameFromQuote(quote) {
+  if (!quote) return '';
+  return String(
+    quote.user?.name ?? quote.contactName ?? quote.userName ?? quote.name ?? ''
+  ).trim();
+}
 
 export default function POS() {
   const { isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const quoteIdParam = searchParams.get('quoteId');
+  const loadedQuoteRef = useRef(null);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selling, setSelling] = useState(false);
   const [lastReceiptUrl, setLastReceiptUrl] = useState(null);
+  const [buyerName, setBuyerName] = useState('');
 
   const filteredProducts = useMemo(() => {
     const withStock = products.filter((p) => Number(p?.stock ?? 0) > 0);
@@ -45,6 +93,47 @@ export default function POS() {
     };
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (!quoteIdParam || loading || products.length === 0) return;
+    const key = String(quoteIdParam);
+    if (loadedQuoteRef.current === key) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get(quoteByIdPath(quoteIdParam));
+        if (cancelled) return;
+        if (data?.success === false) {
+          toast.error(data?.message || 'No se pudo cargar la cotización');
+          return;
+        }
+        const q = unwrapEntity(data, 'quote', 'data') ?? data;
+        const st = q.status || q.estado;
+        if (st !== 'accepted') {
+          toast.error('Solo se puede cargar en el POS una cotización ya aceptada por el cliente.');
+          return;
+        }
+        const lines = buildCartFromQuote(q, products);
+        if (lines.length === 0) {
+          toast.error('La cotización no tiene líneas válidas para el carrito.');
+          return;
+        }
+        setCart(lines);
+        const bn = buyerNameFromQuote(q);
+        if (bn) setBuyerName(bn);
+        loadedQuoteRef.current = key;
+        toast.success('Cotización aceptada cargada en el carrito. Revisa nombre y totales antes de cobrar.');
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(err.response?.data?.message || 'Error al cargar la cotización');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteIdParam, loading, products]);
 
   const productId = (p) => p?.id ?? p?._id;
 
@@ -110,6 +199,11 @@ export default function POS() {
       toast.error('El carrito está vacío');
       return;
     }
+    const customer = buyerName.trim();
+    if (!customer) {
+      toast.error('Indica el nombre del comprador para la factura (cliente registrado o nombre manual).');
+      return;
+    }
     const items = cart
       .map((c) => {
         const productId = c.id ?? c._id;
@@ -141,7 +235,15 @@ export default function POS() {
       const payload = {
         items: itemPayload,
         products: itemPayload,
+        customerName: customer,
+        buyerName: customer,
+        clientName: customer,
+        nombreCliente: customer,
       };
+      if (quoteIdParam) {
+        payload.quoteId = quoteIdParam;
+        payload.quote_id = quoteIdParam;
+      }
       const { data } = await api.post('/sales', payload);
       if (data?.success === false) {
         toast.error(data.message || 'Error al registrar venta');
@@ -211,25 +313,27 @@ export default function POS() {
                     key={productId(p)}
                     type="button"
                     onClick={() => addToCart(p)}
-                    className="flex flex-col bg-dark-800 border border-dark-600 rounded-lg overflow-hidden text-left hover:border-primary-500 hover:bg-dark-700 transition"
+                    className="flex flex-col h-full min-h-[11.5rem] sm:min-h-[13rem] bg-dark-800 border border-dark-600 rounded-lg overflow-hidden text-left hover:border-primary-500 hover:bg-dark-700 transition"
                   >
-                    <div className="h-[4.25rem] sm:h-24 md:h-28 shrink-0 bg-dark-700 flex items-center justify-center overflow-hidden">
+                    <div className="flex-1 min-h-[6.5rem] sm:min-h-[7.5rem] md:min-h-[8.5rem] bg-dark-700 flex items-center justify-center overflow-hidden">
                       {imgUrl ? (
                         <img
                           src={imgUrl}
                           alt={p?.name ?? p?.nombre ?? ''}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full min-h-0 object-cover object-center"
                         />
                       ) : (
-                        <span className="text-4xl text-dark-500">📦</span>
+                        <span className="text-5xl sm:text-6xl text-dark-500">📦</span>
                       )}
                     </div>
-                    <div className="p-3 flex-1 min-w-0">
-                      <p className="font-medium text-dark-100 truncate text-sm">{p?.name ?? p?.nombre ?? 'Producto'}</p>
-                      <p className="text-primary-400 font-semibold mt-1 text-sm">
+                    <div className="p-2.5 sm:p-3 shrink-0 border-t border-dark-600/80 bg-dark-800/95">
+                      <p className="font-medium text-dark-100 truncate text-sm leading-snug">
+                        {p?.name ?? p?.nombre ?? 'Producto'}
+                      </p>
+                      <p className="text-primary-400 font-semibold mt-0.5 text-sm">
                         Q{Number(p?.publicPrice ?? 0).toLocaleString()}
                       </p>
-                      <p className="text-xs text-dark-500">Stock: {p?.stock ?? 0}</p>
+                      <p className="text-xs text-dark-500 mt-0.5">Stock: {p?.stock ?? 0}</p>
                     </div>
                   </button>
                 );
@@ -241,6 +345,22 @@ export default function POS() {
         {/* Carrito */}
         <div className="bg-dark-900 border border-dark-700 rounded-xl p-3 sm:p-4 min-h-0 h-[min(42dvh,320px)] sm:h-[min(48dvh,380px)] lg:h-[70vh] flex flex-col">
           <h2 className="font-semibold text-dark-200 mb-4">Carrito</h2>
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-dark-400 mb-1.5">
+              Nombre en factura (comprador)
+            </label>
+            <input
+              type="text"
+              value={buyerName}
+              onChange={(e) => setBuyerName(e.target.value)}
+              placeholder="Ej. Juan Pérez o razón social"
+              className="w-full px-3 py-2.5 bg-dark-800 border border-dark-600 rounded-lg text-dark-100 text-sm placeholder-dark-500 focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+            <p className="text-[11px] text-dark-500 mt-1">
+              Venta en mostrador: escribe el nombre aunque no tenga cuenta. Si cargaste una cotización aceptada, se
+              rellena solo y puedes corregirlo.
+            </p>
+          </div>
           <div className="flex-1 overflow-y-auto space-y-3">
             {cart.length === 0 ? (
               <p className="text-dark-500 text-sm">Sin productos</p>

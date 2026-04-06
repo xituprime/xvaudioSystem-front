@@ -9,6 +9,22 @@ const FONT_SUB = 11;
 const FONT_BODY = 10;
 const FONT_SMALL = 8.5;
 
+export function getSaleCustomerName(sale) {
+  if (!sale) return '';
+  const raw = (
+    sale.customerName ??
+    sale.buyerName ??
+    sale.clientName ??
+    sale.nombreCliente ??
+    sale.nombre_comprador ??
+    sale.client?.name ??
+    sale.user?.name ??
+    sale.buyer?.name ??
+    ''
+  );
+  return String(raw).trim();
+}
+
 function sumItemsTotal(items) {
   return items.reduce((acc, it) => {
     const qty = Number(it?.quantity ?? it?.qty ?? 0);
@@ -58,6 +74,12 @@ export function downloadReceiptPdf(sale) {
   doc.text('Fecha', MARGIN, y);
   doc.setFont('helvetica', 'normal');
   doc.text(dateStr, 50, y);
+  y += LINE;
+  const customerName = getSaleCustomerName(sale);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Cliente', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(customerName || '—', 50, y);
   y += LINE + 6;
 
   if (items.length > 0) {

@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { getPrimaryImageUrl } from '../utils/productImages';
+import { useQuoteCart } from '../context/QuoteCartContext';
 
 export default function ProductCard({ product, isAdmin, onDelete }) {
+  const { addItem } = useQuoteCart();
   const imageUrl = getPrimaryImageUrl(product);
   const [imageFailed, setImageFailed] = useState(false);
   const showPlaceholder = !imageUrl || imageFailed;
@@ -53,12 +56,24 @@ export default function ProductCard({ product, isAdmin, onDelete }) {
           </>
         )}
         {!isAdmin && (
-          <Link
-            to={`/products/${id}`}
-            className="mt-4 block text-center py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition"
-          >
-            Ver detalle
-          </Link>
+          <div className="mt-4 flex flex-col gap-2">
+            <Link
+              to={`/products/${id}`}
+              className="block text-center py-2 bg-dark-800 hover:bg-dark-700 border border-dark-600 text-dark-100 rounded-lg text-sm font-medium transition"
+            >
+              Ver detalle
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                addItem(product, 1);
+                toast.success('Añadido a cotización');
+              }}
+              className="w-full text-center py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition"
+            >
+              Añadir a cotización
+            </button>
+          </div>
         )}
       </div>
     </div>

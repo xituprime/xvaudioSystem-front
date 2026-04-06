@@ -3,6 +3,17 @@ import axios from 'axios';
 // En desarrollo usar '/api' para que el proxy de Vite evite CORS
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+function isAuthRoute(url) {
+  if (!url) return false;
+  const u = String(url);
+  return (
+    u.includes('/auth/login') ||
+    u.includes('/auth/register') ||
+    u.includes('/auth/verify-email') ||
+    u.includes('/auth/resend-verification')
+  );
+}
+
 /** Verifica si el JWT está expirado (claim exp en segundos). Si no es JWT o no tiene exp, no expira por este check. */
 function isTokenExpired(token) {
   if (!token || typeof token !== 'string') return true;
@@ -18,11 +29,9 @@ function isTokenExpired(token) {
   }
 }
 
-function clearAuthAndRedirect() {
+function notifySessionExpired() {
   localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  window.dispatchEvent(new Event('auth:logout'));
-  window.location.href = '/login';
+  window.dispatchEvent(new CustomEvent('auth:session-expired'));
 }
 
 export const api = axios.create({
@@ -39,7 +48,7 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       if (isTokenExpired(token)) {
-        clearAuthAndRedirect();
+        notifySessionExpired();
         return Promise.reject(new Error('Token expirado'));
       }
       config.headers.Authorization = `Bearer ${token}`;
@@ -49,14 +58,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response: manejo centralizado 401 y 403
+// Response: 401 → modal re-login (no redirección dura); no aplica a login/register
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
       const status = error.response.status;
       if (status === 401) {
-        clearAuthAndRedirect();
+        const url = error.config?.url || '';
+        if (!isAuthRoute(url)) {
+          notifySessionExpired();
+        }
       }
       if (status === 403) {
         window.dispatchEvent(new Event('auth:forbidden'));

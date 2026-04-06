@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { to: '/dashboard/quotes', label: 'Cotizaciones', icon: '📋' },
+  { to: '/account', label: 'Mi cuenta', icon: '👤' },
   { to: '/products', label: 'Productos', icon: '📦' },
   { to: '/pos', label: 'POS', icon: '🛒' },
   { to: '/reports', label: 'Reportes', icon: '📈' },
@@ -36,6 +38,7 @@ export default function Sidebar({ onNavigate, menuOpen = false }) {
           <NavLink
             key={to}
             to={to}
+            end={to === '/dashboard'}
             onClick={() => onNavigate?.()}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${

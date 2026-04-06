@@ -8,7 +8,14 @@ import ProductsLayout from './components/ProductsLayout';
 import AdminLayout from './layouts/AdminLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
+import Account from './pages/Account';
+import QuoteCart from './pages/QuoteCart';
+import MyQuotes from './pages/MyQuotes';
+import QuoteDetailClient from './pages/QuoteDetailClient';
+import QuotesAdmin from './pages/QuotesAdmin';
+import QuoteDetailAdmin from './pages/QuoteDetailAdmin';
 import Products from './pages/Products';
 import ProductForm from './pages/ProductForm';
 import ProductDetail from './pages/ProductDetail';
@@ -32,10 +39,23 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/" element={<ProtectedRoute />}>
         <Route index element={<HomeRedirect />} />
         <Route path="dashboard" element={<RoleRoute allowedRoles="admin"><AdminLayout /></RoleRoute>}>
           <Route index element={<Dashboard />} />
+          <Route path="quotes" element={<QuotesAdmin />} />
+          <Route path="quotes/:id" element={<QuoteDetailAdmin />} />
+        </Route>
+        <Route path="account" element={<ProductsLayout />}>
+          <Route index element={<Account />} />
+        </Route>
+        <Route path="quote-cart" element={<ProductsLayout />}>
+          <Route index element={<RoleRoute allowedRoles="client"><QuoteCart /></RoleRoute>} />
+        </Route>
+        <Route path="my-quotes" element={<ProductsLayout />}>
+          <Route index element={<RoleRoute allowedRoles="client"><MyQuotes /></RoleRoute>} />
+          <Route path=":id" element={<RoleRoute allowedRoles="client"><QuoteDetailClient /></RoleRoute>} />
         </Route>
         <Route path="products" element={<ProductsLayout />}>
           <Route index element={<Products />} />

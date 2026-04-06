@@ -8,16 +8,45 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  const registeredEmail = location.state?.registeredEmail;
 
   useEffect(() => {
     if (user) {
       navigate(user.role === 'admin' ? '/dashboard' : '/products', { replace: true });
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (registeredEmail) {
+      setEmail(registeredEmail);
+    }
+  }, [registeredEmail]);
+
+  const handleResend = async (e) => {
+    e.preventDefault();
+    const target = email.trim();
+    if (!target) {
+      toast.error('Escribe tu correo para reenviar la verificación');
+      return;
+    }
+    setResendLoading(true);
+    try {
+      const { data } = await api.post('/auth/resend-verification', { email: target });
+      if (data?.success === false) {
+        toast.error(data?.message || 'No se pudo reenviar');
+        return;
+      }
+      toast.success(data?.message || 'Si existe la cuenta, recibirás un nuevo correo.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo reenviar el correo');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -67,6 +96,12 @@ export default function Login() {
           onSubmit={handleSubmit}
           className="bg-dark-900 border border-dark-700 rounded-xl p-8 shadow-xl"
         >
+          {registeredEmail && (
+            <div className="mb-6 p-4 rounded-lg bg-primary-500/10 border border-primary-500/30 text-primary-100 text-sm">
+              Te enviamos un enlace a <strong className="text-primary-50">{registeredEmail}</strong>. Verifica tu
+              correo antes de iniciar sesión.
+            </div>
+          )}
           <div className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-2">Email</label>
@@ -104,6 +139,17 @@ export default function Login() {
               Regístrate
             </Link>
           </p>
+          <div className="mt-6 pt-6 border-t border-dark-700">
+            <p className="text-xs text-dark-500 text-center mb-3">¿No recibiste el correo de verificación?</p>
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendLoading}
+              className="w-full py-2.5 px-4 bg-dark-800 hover:bg-dark-700 border border-dark-600 text-dark-200 text-sm font-medium rounded-lg transition disabled:opacity-50"
+            >
+              {resendLoading ? 'Enviando…' : 'Reenviar correo de verificación'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -23,25 +23,34 @@ export default function Register() {
     setLoading(true);
     try {
       const { data, headers } = await api.post('/auth/register', { email, password, name });
+      if (data?.success === false) {
+        toast.error(data?.message || 'Error al registrarse');
+        return;
+      }
       const token =
         data?.token ??
         data?.accessToken ??
         (typeof headers?.authorization === 'string' && headers.authorization.replace(/^Bearer\s+/i, '').trim());
       const userData = data?.user ?? data?.data?.user ?? data?.data;
-      if (!token || !userData) {
-        toast.error(data?.message || 'Respuesta inválida del servidor');
+
+      if (token && userData && typeof userData === 'object') {
+        login(token, userData);
+        const role = userData?.role ?? userData?.roleName;
+        const redirect = role === 'admin' ? '/dashboard' : '/products';
+        toast.success(data?.message || 'Cuenta creada');
+        navigate(redirect, { replace: true });
         return;
       }
-      if (data?.success === false) {
-        toast.error(data?.message || 'Error al registrarse');
+
+      if (data?.message || userData) {
+        toast.success(
+          data?.message || 'Te enviamos un correo para verificar tu cuenta antes de iniciar sesión.'
+        );
+        navigate('/login', { replace: true, state: { registeredEmail: email } });
         return;
       }
-      login(token, typeof userData === 'object' ? userData : { email: userData, role: 'client' });
-      const role = userData?.role ?? userData?.roleName;
-      const redirect = role === 'admin' ? '/dashboard' : '/products';
-      toast.success('Cuenta creada');
-      setLoading(false);
-      navigate(redirect, { replace: true });
+
+      toast.error(data?.message || 'Respuesta inválida del servidor');
     } catch (err) {
       const msg =
         err.response?.data?.message ||

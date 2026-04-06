@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
 import { getProductImageUrls } from '../utils/productImages';
+import { useAuth } from '../context/AuthContext';
+import { useQuoteCart } from '../context/QuoteCartContext';
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const { isAdmin } = useAuth();
+  const { addItem } = useQuoteCart();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(0);
+  const [qty, setQty] = useState(1);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -46,8 +51,8 @@ export default function ProductDetail() {
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pb-8 sm:pb-12 pt-safe">
-      <div className="rounded-2xl overflow-hidden border border-dark-700/80 bg-gradient-to-b from-dark-900 to-dark-950 shadow-2xl">
-        <div className="relative h-[min(36dvh,220px)] sm:h-[min(40dvh,260px)] md:h-[min(48dvh,320px)] lg:h-auto lg:aspect-[16/10] lg:min-h-[260px] bg-dark-800 group">
+      <div className="rounded-2xl overflow-hidden border border-dark-700/80 bg-gradient-to-b from-dark-900 to-dark-950 shadow-2xl lg:grid lg:grid-cols-12 lg:items-start">
+        <div className="relative h-[min(36dvh,220px)] sm:h-[min(40dvh,260px)] md:h-[min(44dvh,280px)] lg:col-span-5 lg:h-[min(220px,32vh)] lg:max-h-[280px] xl:max-h-[300px] lg:min-h-[200px] bg-dark-800/90 group flex items-center justify-center p-3 sm:p-4 lg:border-r lg:border-dark-700/60">
           {images.length > 0 ? (
             <>
               <img
@@ -96,7 +101,7 @@ export default function ProductDetail() {
           )}
         </div>
 
-        <div className="p-4 sm:p-6 md:p-10 border-t border-dark-700/60">
+        <div className="p-4 sm:p-6 md:p-8 lg:col-span-7 lg:border-t-0 border-t border-dark-700/60 lg:py-8 lg:px-8 xl:px-10">
           <p className="text-xs font-semibold text-primary-400 uppercase tracking-widest">
             {product.category || 'Sin categoría'}
           </p>
@@ -113,6 +118,37 @@ export default function ProductDetail() {
             </p>
             <span className="text-sm text-dark-500">Stock: {product.stock ?? 0} unidades</span>
           </div>
+          {!isAdmin && (
+            <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-dark-400">
+                Cantidad
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={qty}
+                  onChange={(e) => setQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
+                  className="w-20 px-2 py-2 bg-dark-800 border border-dark-600 rounded-lg text-dark-100 text-center"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  addItem(product, qty);
+                  toast.success('Añadido a cotización');
+                }}
+                className="px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-lg transition"
+              >
+                Añadir a cotización
+              </button>
+              <Link
+                to="/quote-cart"
+                className="inline-flex items-center justify-center px-6 py-3 bg-dark-800 hover:bg-dark-700 border border-dark-600 text-dark-200 font-medium rounded-lg transition text-sm"
+              >
+                Ver cotización
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

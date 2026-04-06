@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -34,27 +34,40 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = (token, userData) => {
+  const login = useCallback((token, userData) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     window.dispatchEvent(new Event('auth:logout'));
-  };
+  }, []);
 
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    isAdmin: user?.role === 'admin',
-    isClient: user?.role === 'client',
-  };
+  const updateUser = useCallback((partial) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...partial };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      login,
+      logout,
+      updateUser,
+      isAdmin: user?.role === 'admin',
+      isClient: user?.role === 'client',
+    }),
+    [user, loading, login, logout, updateUser]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -5,18 +5,12 @@ import api from '../api/axiosConfig';
 import { quotesBase } from '../config/apiPaths';
 import { unwrapList } from '../utils/apiData';
 import { QUOTE_STATUS_LABEL } from '../constants/quoteStatus';
-
-function quoteId(q) {
-  return q?.id ?? q?._id;
-}
-
-function contactEmail(q) {
-  return q.contactEmail || q.userEmail || q.email || q.user?.email || '—';
-}
-
-function contactName(q) {
-  return q.contactName || q.userName || q.name || q.user?.name || '';
-}
+import {
+  normalizeQuoteList,
+  quoteClientPrimaryLine,
+  quoteClientSecondaryLine,
+  quoteRecordId,
+} from '../utils/quoteHelpers';
 
 export default function QuotesAdmin() {
   const [quotes, setQuotes] = useState([]);
@@ -35,7 +29,7 @@ export default function QuotesAdmin() {
           return;
         }
         setApiMissing(false);
-        setQuotes(unwrapList(data, ['quotes', 'data', 'items']));
+        setQuotes(normalizeQuoteList(unwrapList(data, ['quotes', 'data', 'items'])));
       } catch (err) {
         if (err.response?.status === 404) {
           setApiMissing(true);
@@ -112,15 +106,17 @@ export default function QuotesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {quotes.map((q) => {
-                const id = quoteId(q);
+              {quotes.map((q, rowIdx) => {
+                const id = quoteRecordId(q);
                 const status = q.status || q.estado || 'pending';
                 return (
-                  <tr key={id} className="border-b border-dark-800 hover:bg-dark-800/40">
+                  <tr key={id ?? `q-${rowIdx}`} className="border-b border-dark-800 hover:bg-dark-800/40">
                     <td className="p-4 font-mono text-dark-500">#{id}</td>
                     <td className="p-4">
-                      <p className="text-dark-100 font-medium">{contactEmail(q)}</p>
-                      {contactName(q) && <p className="text-dark-500 text-xs mt-0.5">{contactName(q)}</p>}
+                      <p className="text-dark-100 font-medium">{quoteClientPrimaryLine(q)}</p>
+                      {quoteClientSecondaryLine(q) && (
+                        <p className="text-dark-500 text-xs mt-0.5">{quoteClientSecondaryLine(q)}</p>
+                      )}
                     </td>
                     <td className="p-4 text-dark-400">
                       {new Date(q.createdAt || q.created_at || Date.now()).toLocaleString()}

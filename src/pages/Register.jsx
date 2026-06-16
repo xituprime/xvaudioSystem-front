@@ -55,7 +55,7 @@ export default function Register() {
       const msg =
         err.response?.data?.message ||
         (err.code === 'ECONNABORTED' && 'El servidor no respondió a tiempo.') ||
-        (err.message?.includes('Network') && 'No se pudo conectar. ¿Backend en http://127.0.0.1:5000?') ||
+        (err.message?.includes('Network') && 'No se pudo conectar con el backend. Revisa VITE_API_URL.') ||
         'Error de conexión';
       toast.error(msg);
     } finally {

@@ -8,6 +8,20 @@ import SessionExpiredModal from './components/SessionExpiredModal'
 import App from './App'
 import './index.css'
 
+// Chrome/Edge + Vite HMR: aviso benigno del ResizeObserver; no es fallo de la app.
+if (import.meta.env.DEV) {
+  const re = /ResizeObserver loop/i
+  window.addEventListener(
+    'error',
+    (e) => {
+      if (typeof e.message === 'string' && re.test(e.message)) {
+        e.stopImmediatePropagation()
+      }
+    },
+    true,
+  )
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter

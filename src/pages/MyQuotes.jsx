@@ -5,10 +5,7 @@ import api from '../api/axiosConfig';
 import { quotesMinePath } from '../config/apiPaths';
 import { unwrapList } from '../utils/apiData';
 import { QUOTE_STATUS_LABEL } from '../constants/quoteStatus';
-
-function quoteId(q) {
-  return q?.id ?? q?._id;
-}
+import { normalizeQuoteList, quoteRecordId } from '../utils/quoteHelpers';
 
 export default function MyQuotes() {
   const [quotes, setQuotes] = useState([]);
@@ -25,7 +22,7 @@ export default function MyQuotes() {
           return;
         }
         setApiMissing(false);
-        setQuotes(unwrapList(data, ['quotes', 'data', 'items']));
+        setQuotes(normalizeQuoteList(unwrapList(data, ['quotes', 'data', 'items'])));
       } catch (err) {
         if (err.response?.status === 404) {
           setApiMissing(true);
@@ -82,11 +79,11 @@ export default function MyQuotes() {
         </p>
       ) : (
         <ul className="space-y-3">
-          {quotes.map((q) => {
-            const id = quoteId(q);
+          {quotes.map((q, rowIdx) => {
+            const id = quoteRecordId(q);
             const status = q.status || q.estado || 'pending';
             return (
-              <li key={id}>
+              <li key={id ?? `mq-${rowIdx}`}>
                 <Link
                   to={`/my-quotes/${id}`}
                   className="block bg-dark-900/80 border border-dark-700 hover:border-primary-500/40 rounded-xl p-4 transition"

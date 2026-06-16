@@ -3,8 +3,16 @@ import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
 import { quoteByIdPath } from '../config/apiPaths';
-import { unwrapEntity } from '../utils/apiData';
 import { getQuoteClientRequestMessage, getQuoteOfferMessage } from '../utils/quotes';
+import {
+  quoteClientPrimaryLine,
+  quoteClientSecondaryLine,
+  quoteContactEmail,
+  quoteContactPhone,
+  quoteLineItems,
+  quoteRecordId,
+  unwrapQuoteEntity,
+} from '../utils/quoteHelpers';
 import { QUOTE_ADMIN_STATUS_ORDER } from '../constants/quoteStatus';
 
 export default function QuoteDetailAdmin() {
@@ -27,7 +35,12 @@ export default function QuoteDetailAdmin() {
           setQuote(null);
           return;
         }
-        const q = unwrapEntity(data, 'quote', 'data') ?? data;
+        const q = unwrapQuoteEntity(data);
+        if (!q) {
+          toast.error(data?.message || 'Cotización no válida');
+          setQuote(null);
+          return;
+        }
         setQuote(q);
         setStatus(q.status || q.estado || 'pending');
         setAdminNotes(q.adminNotes || q.admin_notes || q.notes || '');
@@ -61,7 +74,7 @@ export default function QuoteDetailAdmin() {
         toast.error(data?.message || 'Error al guardar');
         return;
       }
-      const q = unwrapEntity(data, 'quote', 'data') ?? data;
+      const q = unwrapQuoteEntity(data);
       if (q && typeof q === 'object') setQuote((prev) => ({ ...prev, ...q }));
       toast.success('Cotización actualizada');
     } catch (err) {
@@ -90,17 +103,12 @@ export default function QuoteDetailAdmin() {
     );
   }
 
-  const items =
-    quote.items ||
-    quote.quoteItems ||
-    quote.lineItems ||
-    quote.lines ||
-    [];
+  const items = quoteLineItems(quote);
 
-  const email =
-    quote.contactEmail || quote.userEmail || quote.email || quote.user?.email || '—';
-  const name = quote.contactName || quote.userName || quote.name || quote.user?.name || '';
-  const phone = quote.contactPhone || quote.phone || quote.user?.phone || quote.user?.telefono;
+  const email = quoteContactEmail(quote);
+  const phone = quoteContactPhone(quote);
+  const contactPrimary = quoteClientPrimaryLine(quote);
+  const contactSecondary = quoteClientSecondaryLine(quote);
 
   const clientRequestText = getQuoteClientRequestMessage(quote);
 
@@ -114,7 +122,9 @@ export default function QuoteDetailAdmin() {
       </Link>
 
       <div className="bg-dark-900 border border-dark-700 rounded-xl p-6">
-        <h1 className="text-xl font-bold text-dark-100">Cotización #{quote.id ?? quote._id ?? id}</h1>
+        <h1 className="text-xl font-bold text-dark-100">
+          Cotización #{quoteRecordId(quote) ?? id}
+        </h1>
         <p className="text-dark-500 text-sm mt-1">
           {new Date(quote.createdAt || quote.created_at || Date.now()).toLocaleString()}
         </p>
@@ -122,11 +132,15 @@ export default function QuoteDetailAdmin() {
         <div className="mt-6 p-4 rounded-lg bg-dark-800/80 border border-dark-600 space-y-2">
           <p className="text-sm text-dark-400">Contacto</p>
           <p className="text-dark-100 font-medium">
-            <a href={`mailto:${email}`} className="text-primary-400 hover:underline">
-              {email}
-            </a>
+            {email !== '—' ? (
+              <a href={`mailto:${email}`} className="text-primary-400 hover:underline">
+                {email}
+              </a>
+            ) : (
+              <span className="text-dark-200">{contactPrimary}</span>
+            )}
           </p>
-          {name && <p className="text-dark-300 text-sm">{name}</p>}
+          {contactSecondary && <p className="text-dark-300 text-sm">{contactSecondary}</p>}
           {phone && (
             <p className="text-dark-300 text-sm">
               <a href={`tel:${phone}`} className="text-primary-400 hover:underline">
@@ -154,8 +168,9 @@ export default function QuoteDetailAdmin() {
               `Ítem ${idx + 1}`;
             const qty = line.quantity ?? line.qty ?? 1;
             const price = Number(line.unitPrice ?? line.price ?? line.publicPrice ?? 0);
+            const lineKey = line._id ?? line.id ?? idx;
             return (
-              <li key={idx} className="flex justify-between gap-4 text-sm text-dark-200">
+              <li key={lineKey} className="flex justify-between gap-4 text-sm text-dark-200">
                 <span>
                   {pname} × {qty}
                 </span>

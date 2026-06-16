@@ -5,7 +5,7 @@ Frontend del sistema de inventario y POS para XV Audio. Desarrollado con React (
 ## Requisitos
 
 - Node.js 18+
-- Backend XV Audio corriendo (por defecto `http://localhost:5000`)
+- Backend XV Audio disponible en producción en `https://xvaudiosystem-back.onrender.com/api`
 
 ## Configuración
 
@@ -15,7 +15,11 @@ Frontend del sistema de inventario y POS para XV Audio. Desarrollado con React (
    ```
 2. Editar `.env` si tu API está en otra URL:
    ```
-   VITE_API_URL=http://localhost:5000/api
+   VITE_API_URL=https://xvaudiosystem-back.onrender.com/api
+   ```
+3. En Vercel, configura la variable de entorno:
+   ```text
+   VITE_API_URL=https://xvaudiosystem-back.onrender.com/api
    ```
 
 ## Instalación y ejecución
@@ -25,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000).
+Abre la aplicación de desarrollo en el puerto configurado por Vite.
 
 ## Build para producción
 

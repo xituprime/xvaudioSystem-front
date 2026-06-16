@@ -3,8 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../api/axiosConfig';
 import { quoteAcceptPath, quoteByIdPath, quoteRejectPath } from '../config/apiPaths';
-import { unwrapEntity } from '../utils/apiData';
 import { getQuoteClientRequestMessage, getQuoteOfferMessage } from '../utils/quotes';
+import { quoteLineItems, quoteRecordId, unwrapQuoteEntity } from '../utils/quoteHelpers';
 import { QUOTE_STATUS_LABEL } from '../constants/quoteStatus';
 
 export default function QuoteDetailClient() {
@@ -20,8 +20,8 @@ export default function QuoteDetailClient() {
       setQuote(null);
       return;
     }
-    const q = unwrapEntity(data, 'quote', 'data') ?? data;
-    setQuote(q);
+    const q = unwrapQuoteEntity(data);
+    setQuote(q || null);
   }, [id]);
 
   useEffect(() => {
@@ -107,12 +107,7 @@ export default function QuoteDetailClient() {
 
   const status = quote.status || quote.estado || 'pending';
   const myRequestText = getQuoteClientRequestMessage(quote);
-  const items =
-    quote.items ||
-    quote.quoteItems ||
-    quote.lineItems ||
-    quote.lines ||
-    [];
+  const items = quoteLineItems(quote);
 
   const offerText = getQuoteOfferMessage(quote);
   const awaitingOffer = status === 'offered';
@@ -124,7 +119,9 @@ export default function QuoteDetailClient() {
       </Link>
       <div className="bg-dark-900/80 border border-dark-700 rounded-xl p-6 shadow-lg">
         <div className="flex flex-wrap justify-between gap-2">
-          <h1 className="text-xl font-bold text-dark-50">Cotización #{quote.id ?? quote._id ?? id}</h1>
+          <h1 className="text-xl font-bold text-dark-50">
+            Cotización #{quoteRecordId(quote) ?? id}
+          </h1>
           <span className="text-sm font-semibold text-primary-400">
             {QUOTE_STATUS_LABEL[status] || status}
           </span>
@@ -182,8 +179,9 @@ export default function QuoteDetailClient() {
               `Producto ${idx + 1}`;
             const qty = line.quantity ?? line.qty ?? 1;
             const price = Number(line.unitPrice ?? line.price ?? line.publicPrice ?? 0);
+            const lineKey = line._id ?? line.id ?? idx;
             return (
-              <li key={idx} className="flex justify-between gap-4 text-sm">
+              <li key={lineKey} className="flex justify-between gap-4 text-sm">
                 <span className="text-dark-200">
                   {name} × {qty}
                 </span>

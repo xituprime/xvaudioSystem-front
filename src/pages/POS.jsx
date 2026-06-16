@@ -5,15 +5,18 @@ import api from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
 import { getPrimaryImageUrl } from '../utils/productImages';
 import { quoteByIdPath } from '../config/apiPaths';
-import { unwrapEntity } from '../utils/apiData';
+import { quoteContactName, quoteLineItems, unwrapQuoteEntity } from '../utils/quoteHelpers';
 
 function buildCartFromQuote(quote, productList) {
-  const raw =
-    quote?.items || quote?.quoteItems || quote?.lineItems || quote?.lines || [];
-  return raw
+  return quoteLineItems(quote)
     .map((line) => {
+      const prodRef = line.product;
       const pid =
-        line.productId ?? line.product_id ?? line.product?.id ?? line.product?._id;
+        line.productId ??
+        line.product_id ??
+        (typeof prodRef === 'string' ? prodRef : null) ??
+        prodRef?.id ??
+        prodRef?._id;
       if (pid == null || pid === '') return null;
       const qty = Math.max(1, Number(line.quantity ?? line.qty ?? 1));
       const prod = productList.find((p) => String(p?.id ?? p?._id) === String(pid));
@@ -42,10 +45,7 @@ function buildCartFromQuote(quote, productList) {
 }
 
 function buyerNameFromQuote(quote) {
-  if (!quote) return '';
-  return String(
-    quote.user?.name ?? quote.contactName ?? quote.userName ?? quote.name ?? ''
-  ).trim();
+  return quoteContactName(quote).trim();
 }
 
 export default function POS() {
@@ -108,7 +108,11 @@ export default function POS() {
           toast.error(data?.message || 'No se pudo cargar la cotización');
           return;
         }
-        const q = unwrapEntity(data, 'quote', 'data') ?? data;
+        const q = unwrapQuoteEntity(data);
+        if (!q) {
+          toast.error('Respuesta de cotización no válida.');
+          return;
+        }
         const st = q.status || q.estado;
         if (st !== 'accepted') {
           toast.error('Solo se puede cargar en el POS una cotización ya aceptada por el cliente.');
